@@ -96,4 +96,4 @@ polyskills/
 
 ## License
 
-MIT
+[MIT](LICENSE) © Gregory Errl Babela
