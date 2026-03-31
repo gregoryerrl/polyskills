@@ -1,0 +1,22 @@
+{
+  "name": "polyskills",
+  "description": "Research, visualization, and synthesis skills for Claude Code: deep codebase investigation, interactive HTML explainers, and chained research-to-visual workflows",
+  "version": "1.0.0",
+  "author": {
+    "name": "Gregory Errl",
+    "url": "https://github.com/gregoryerrl"
+  },
+  "homepage": "https://github.com/gregoryerrl/polyskills",
+  "repository": "https://github.com/gregoryerrl/polyskills",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "investigation",
+    "visualization",
+    "explainer",
+    "research",
+    "mermaid",
+    "html",
+    "codebase-analysis"
+  ]
+}
