@@ -1,11 +1,11 @@
 ---
 name: html-skeleton
-description: Base HTML template with dark/light toggle, Mermaid dual-theme, scroll-spy — copy and fill in sections
+description: Base HTML template with dark/light toggle, visualization infrastructure, Mermaid dual-theme, scroll-spy — copy and fill in sections
 ---
 
 # HTML Skeleton
 
-Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language components as needed.
+Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language components as needed. Add custom visualizations (SVG, Canvas, animations) in the sections.
 
 ```html
 <!DOCTYPE html>
@@ -99,6 +99,37 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
     .theme-toggle { transition: all 0.3s ease; }
     .theme-toggle:hover { transform: rotate(15deg); }
 
+    /* Custom visualization base styles */
+    .viz-container { position: relative; overflow: hidden; }
+    .viz-container canvas { display: block; border-radius: 0.5rem; }
+    .viz-container svg { display: block; }
+
+    /* SVG visualization theme styles */
+    .viz-path { stroke: #3b82f6; transition: stroke 0.3s ease; }
+    .viz-particle { transition: fill 0.3s ease; }
+    .viz-node circle, .viz-node rect, .viz-node ellipse { transition: fill 0.3s ease, stroke 0.3s ease; }
+    .viz-node text { transition: fill 0.3s ease; }
+    .viz-node-bg { fill: #dbeafe; stroke: #3b82f6; transition: all 0.3s ease; }
+    .viz-node-label { fill: #1e293b; transition: fill 0.3s ease; }
+
+    /* Interactive node hover effects */
+    .viz-interactive-node { cursor: pointer; transition: transform 0.2s ease; }
+    .viz-interactive-node:hover { transform: scale(1.05); }
+    .viz-interactive-node:hover .viz-node-bg { filter: drop-shadow(0 4px 12px rgba(59,130,246,0.3)); }
+
+    /* Glow effect for animated elements */
+    @keyframes glow-pulse {
+      0%, 100% { filter: drop-shadow(0 0 4px rgba(96,165,250,0.4)); }
+      50% { filter: drop-shadow(0 0 12px rgba(96,165,250,0.8)); }
+    }
+    .viz-glow { animation: glow-pulse 2s ease-in-out infinite; }
+
+    /* Stagger-in animation for cards/items */
+    @keyframes stagger-in {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     /* Dark mode — use solid backgrounds, not rgba() */
     html.dark { color-scheme: dark; }
     .dark body { background-color: #0f172a; color: #cbd5e1; }
@@ -121,6 +152,15 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
     .dark .toc-link:hover { color: #60a5fa !important; border-color: #3b82f6 !important; }
     .dark .toc-link.active { color: #60a5fa !important; border-left-color: #60a5fa !important; background-color: #1e293b !important; }
     .dark #toc-mobile { background-color: #1e293b !important; border-color: #334155 !important; }
+
+    /* Dark mode visualization overrides */
+    .dark .viz-path { stroke: #60a5fa; }
+    .dark .viz-particle { fill: #60a5fa; }
+    .dark .viz-node circle, .dark .viz-node rect, .dark .viz-node ellipse { fill: #1e3a5f; stroke: #60a5fa; }
+    .dark .viz-node text { fill: #e2e8f0; }
+    .dark .viz-node-bg { fill: #1e3a5f; stroke: #60a5fa; }
+    .dark .viz-node-label { fill: #e2e8f0; }
+    .dark .viz-interactive-node:hover .viz-node-bg { filter: drop-shadow(0 4px 12px rgba(96,165,250,0.4)); }
 
     /* Callout dark overrides — solid dark-tinted backgrounds */
     .dark .bg-red-50 { background-color: #2a1215 !important; }
@@ -203,14 +243,49 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
   </div>
 
   <script>
-    // Save mermaid sources before rendering
+    // ═══════════════════════════════════════════════
+    // Theme-aware color helper for custom visualizations
+    // ═══════════════════════════════════════════════
+    function isDarkMode() { return document.documentElement.classList.contains('dark'); }
+
+    function getVizColors() {
+      const dark = isDarkMode();
+      return {
+        bg: dark ? '#0f172a' : '#ffffff',
+        surface: dark ? '#1e293b' : '#f8fafc',
+        border: dark ? '#334155' : '#e2e8f0',
+        text: dark ? '#e2e8f0' : '#1e293b',
+        textMuted: dark ? '#94a3b8' : '#64748b',
+        primary: dark ? '#60a5fa' : '#3b82f6',
+        primaryFaint: dark ? '#172554' : '#dbeafe',
+        success: dark ? '#34d399' : '#10b981',
+        successFaint: dark ? '#064e3b' : '#f0fdf4',
+        error: dark ? '#f87171' : '#ef4444',
+        errorFaint: dark ? '#450a0a' : '#fee2e2',
+        warning: dark ? '#fbbf24' : '#f59e0b',
+        warningFaint: dark ? '#451a03' : '#fef3c7',
+        accent: dark ? '#c4b5fd' : '#8b5cf6',
+        accentFaint: dark ? '#1a0f2e' : '#f5f3ff',
+        particle1: dark ? '#60a5fa' : '#3b82f6',
+        particle2: dark ? '#34d399' : '#10b981',
+        particle3: dark ? '#fbbf24' : '#f59e0b',
+        particle4: dark ? '#f87171' : '#ef4444',
+        glow: dark ? 'rgba(96,165,250,0.3)' : 'rgba(59,130,246,0.15)',
+      };
+    }
+
+    // Theme change callbacks — custom visualizations register here
+    const themeChangeCallbacks = [];
+    function onThemeChange(cb) { themeChangeCallbacks.push(cb); }
+
+    // ═══════════════════════════════════════════════
+    // Mermaid setup (only runs if .mermaid elements exist)
+    // ═══════════════════════════════════════════════
     const mermaidSources = [];
     document.querySelectorAll('.mermaid').forEach((el, i) => {
       mermaidSources.push(el.innerHTML.trim());
       el.setAttribute('data-idx', i);
     });
-
-    function isDarkMode() { return document.documentElement.classList.contains('dark'); }
 
     function initMermaid(isDark) {
       mermaid.initialize({
@@ -230,7 +305,9 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
       return s;
     }
 
+    // ═══════════════════════════════════════════════
     // Diagram click-to-zoom with drag-to-pan
+    // ═══════════════════════════════════════════════
     function openDiagramZoom(e) {
       const svg = e.currentTarget;
       const overlay = document.getElementById('diagram-overlay');
@@ -253,7 +330,6 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
     }
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDiagramZoom(); });
 
-    // Drag-to-pan for the zoom overlay container
     function setupDragToPan(el) {
       let isDragging = false, startX, startY, scrollLeft, scrollTop;
       el.onmousedown = (e) => {
@@ -276,7 +352,6 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
         isDragging = false;
         el.classList.remove('dragging');
       };
-      // Touch support for mobile swipe-to-pan
       let touchStartX, touchStartY, touchScrollLeft, touchScrollTop;
       el.ontouchstart = (e) => {
         const t = e.touches[0];
@@ -293,7 +368,11 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
       };
     }
 
+    // ═══════════════════════════════════════════════
+    // Mermaid rendering
+    // ═══════════════════════════════════════════════
     async function renderMermaid() {
+      if (mermaidSources.length === 0) return;
       const dark = isDarkMode();
       document.querySelectorAll('.mermaid').forEach(el => {
         const idx = el.getAttribute('data-idx');
@@ -301,13 +380,15 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
         el.innerHTML = swapNodeColors(mermaidSources[idx], dark);
       });
       await mermaid.run({ querySelector: '.mermaid' });
-      // Attach click-to-zoom on rendered SVGs
       document.querySelectorAll('.mermaid svg').forEach(svg => {
         svg.removeEventListener('click', openDiagramZoom);
         svg.addEventListener('click', openDiagramZoom);
       });
     }
 
+    // ═══════════════════════════════════════════════
+    // Theme toggle
+    // ═══════════════════════════════════════════════
     function updateToggleIcons() {
       const dark = isDarkMode();
       document.getElementById('icon-sun').classList.toggle('hidden', !dark);
@@ -321,6 +402,9 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
       updateToggleIcons();
       initMermaid(willBeDark);
       renderMermaid();
+      // Notify all custom visualizations of theme change
+      themeChangeCallbacks.forEach(cb => cb(willBeDark));
+      window.dispatchEvent(new CustomEvent('theme-change', { detail: { dark: willBeDark } }));
     }
 
     // Init: apply saved preference (default dark)
@@ -329,7 +413,9 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
     initMermaid(isDarkMode());
     renderMermaid();
 
+    // ═══════════════════════════════════════════════
     // Scroll-spy
+    // ═══════════════════════════════════════════════
     const tocLinks = document.querySelectorAll('.toc-link');
     const sections = document.querySelectorAll('section[id]');
     const tocObs = new IntersectionObserver(entries => {
@@ -347,7 +433,7 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
     }, { threshold: 0.08 });
     document.querySelectorAll('.section-animate').forEach(el => animObs.observe(el));
 
-    // TOC click: force target section visible (fixes navigation to off-screen sections)
+    // TOC click: force target section visible
     document.querySelectorAll('.toc-link, #toc-mobile a').forEach(link => {
       link.addEventListener('click', () => {
         const targetId = link.getAttribute('href')?.replace('#', '');
@@ -366,6 +452,9 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
 
     Prism.highlightAll();
   </script>
+
+  {{CUSTOM_VISUALIZATION_SCRIPTS}}
+
 </body>
 </html>
 ```
@@ -375,3 +464,14 @@ Copy this template. Replace all `{{PLACEHOLDER}}` values. Add Prism language com
 Desktop: `<a href="#id" class="toc-link block pl-3 py-1.5 border-l-2 border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-400 rounded-r-lg">Title</a>`
 
 Mobile: `<a href="#id" onclick="document.getElementById('toc-mobile').classList.add('hidden')" class="block px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-100">Title</a>`
+
+## Custom Visualization Script Placement
+
+Place all custom visualization `<script>` blocks at the `{{CUSTOM_VISUALIZATION_SCRIPTS}}` marker, AFTER the main script block. This ensures `getVizColors()`, `onThemeChange()`, and `isDarkMode()` are available.
+
+Each visualization script should:
+1. Be wrapped in an IIFE to avoid variable collisions: `(function() { ... })();`
+2. Use `getVizColors()` for theme-aware colors
+3. Register for theme changes: `onThemeChange((dark) => { /* re-render */ });`
+4. Handle window resize for Canvas elements: `window.addEventListener('resize', resize);`
+5. Use `requestAnimationFrame` for animations, never `setInterval`

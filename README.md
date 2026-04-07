@@ -16,7 +16,7 @@ Deep research into codebases, issues, topics, or concepts. Outputs structured ma
 
 ### `polyskills:visual-explainer`
 
-Generates standalone interactive HTML pages with Mermaid diagrams, Prism.js code highlighting, dark/light mode, sticky TOC with scroll-spy, and click-to-zoom diagrams.
+Generates standalone interactive HTML pages that make concepts visually undeniable. Uses the full power of HTML — Canvas, SVG, CSS animations, interactive elements, color-coded layouts, Mermaid diagrams, Prism.js code highlighting, and anything else that helps someone *see* the concept. Creative freedom on *what* to build, strict engineering standards on *how* it works (theme-aware, responsive, performant, accessible interactions).
 
 **Triggers:** "explain visually", "visualize this", "teach me about", "create explainer", "visual walkthrough"
 

@@ -1,9 +1,11 @@
 ---
 name: design-system
-description: CDN stack, dual-theme Mermaid config, dark mode CSS, and reusable component patterns for visual explainer pages
+description: Implementation standards and reference patterns — the HOW for building visualizations that actually work
 ---
 
 # Design System
+
+This file is about **how to build things correctly**, not what to build. Creative decisions live in your head. Engineering standards live here.
 
 ## CDN Stack (include ALL in `<head>`)
 
@@ -33,17 +35,123 @@ tailwind.config = {
 }
 ```
 
-## Mermaid Dual Theme
+---
+
+## Implementation Standards
+
+These apply to ANY visualization you build, regardless of technique.
+
+### 1. Theme awareness — MANDATORY
+
+Every visual element must look correct in both dark and light mode. The skeleton provides:
+
+```javascript
+// Always available — returns theme-aware colors
+function getVizColors() {
+  const dark = isDarkMode();
+  return {
+    bg: dark ? '#0f172a' : '#ffffff',
+    surface: dark ? '#1e293b' : '#f8fafc',
+    border: dark ? '#334155' : '#e2e8f0',
+    text: dark ? '#e2e8f0' : '#1e293b',
+    textMuted: dark ? '#94a3b8' : '#64748b',
+    primary: dark ? '#60a5fa' : '#3b82f6',
+    primaryFaint: dark ? '#172554' : '#dbeafe',
+    success: dark ? '#34d399' : '#10b981',
+    successFaint: dark ? '#064e3b' : '#f0fdf4',
+    error: dark ? '#f87171' : '#ef4444',
+    errorFaint: dark ? '#450a0a' : '#fee2e2',
+    warning: dark ? '#fbbf24' : '#f59e0b',
+    warningFaint: dark ? '#451a03' : '#fef3c7',
+    accent: dark ? '#c4b5fd' : '#8b5cf6',
+    accentFaint: dark ? '#1a0f2e' : '#f5f3ff',
+    glow: dark ? 'rgba(96,165,250,0.3)' : 'rgba(59,130,246,0.15)',
+  };
+}
+
+// Register to re-render when theme toggles
+onThemeChange((isDark) => { /* re-render your visualization */ });
+```
+
+**For Canvas**: Call `getVizColors()` inside your draw loop or re-render callback. Register with `onThemeChange`.
+
+**For SVG**: Use CSS classes with `.dark` overrides, OR use inline fills updated via `onThemeChange`. CSS classes are cleaner when possible.
+
+**For CSS animations**: Use Tailwind's `dark:` prefix or `.dark` parent selector.
+
+### 2. Animation quality — MANDATORY
+
+```javascript
+// YES — smooth, synced to display refresh
+function draw() {
+  // ... render logic
+  animId = requestAnimationFrame(draw);
+}
+
+// YES — pause when not visible
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) { running = true; draw(); }
+    else { running = false; cancelAnimationFrame(animId); }
+  });
+}, { threshold: 0.1 });
+obs.observe(canvas);
+
+// NO — never do this for visual rendering
+setInterval(draw, 16); // WRONG
+```
+
+### 3. Script isolation — MANDATORY
+
+Every visualization script must be an IIFE. Multiple visualizations must not interfere.
+
+```javascript
+(function() {
+  const canvas = document.getElementById('viz-unique-name');
+  // ... all state is local to this closure
+})();
+```
+
+### 4. Resize handling — MANDATORY for Canvas/SVG
+
+```javascript
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = desiredHeight * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = desiredHeight + 'px';
+}
+window.addEventListener('resize', resize);
+resize(); // call on init
+```
+
+### 5. Interactive affordances — MANDATORY
+
+If something is interactive, the user must know before they interact:
+- **Clickable**: `cursor: pointer` + hover state change (color, scale, shadow)
+- **Draggable**: `cursor: grab` (+ `cursor: grabbing` while dragging)
+- **Has steps/controls**: Visible buttons with labels, not hidden keyboard shortcuts
+- **Hoverable info**: Tooltip appears smoothly, disappears on leave, doesn't flicker
+
+---
+
+## Mermaid — When You Use It
+
+Mermaid is one tool among many. When you do use it, follow these rules:
 
 Set `startOnLoad: false`. Initialize and render manually so diagrams re-render on theme toggle.
 
-### Mermaid Gotchas
+### Gotchas
 
-**Source capture must use `innerHTML`** — The skeleton captures mermaid sources before rendering. It MUST use `el.innerHTML.trim()`, NOT `el.textContent.trim()`. `textContent` strips `<br/>` tags from node labels, destroying line breaks. `innerHTML` preserves them.
+**Source capture must use `innerHTML`** — NOT `el.textContent.trim()`. `textContent` strips `<br/>` tags from node labels.
 
-**Section IDs must not collide with Mermaid icon names** — Mermaid renders built-in icons as `<symbol id="...">` inside SVG `<defs>`. If a section shares that ID, `document.getElementById()` finds the SVG symbol instead of the section, breaking TOC navigation and scroll-spy. **Banned section IDs**: `database`, `server`, `cloud`, `clock`, `flag`, `heart`, `star`, `lightning`, `gear`, `lock`, `user`, `mail`, `phone`, `document`, `folder`, `search`. Use prefixed alternatives like `db-schema`, `server-arch`, `cloud-infra`, etc.
+**Section IDs must not collide with Mermaid icon names** — Mermaid renders `<symbol id="...">` inside SVG `<defs>`. **Banned section IDs**: `database`, `server`, `cloud`, `clock`, `flag`, `heart`, `star`, `lightning`, `gear`, `lock`, `user`, `mail`, `phone`, `document`, `folder`, `search`. Use prefixed alternatives.
 
-**SVG overflow must be visible** — Mermaid SVGs default to `overflow: hidden`, clipping text that overflows node boundaries. The skeleton sets `overflow: visible !important` on `.mermaid svg`, `foreignObject`, and their zoom overlay equivalents. Do not remove these rules.
+**SVG overflow must be visible** — Set `overflow: visible !important` on `.mermaid svg` and `foreignObject`.
+
+### Dual-theme config
 
 ```javascript
 const mermaidThemes = {
@@ -61,22 +169,18 @@ const mermaidThemes = {
     edgeLabelBackground: '#1e293b',
   }
 };
-mermaid.initialize({ startOnLoad: false });
 ```
 
-### Mermaid Node Color Swaps
+### Node color swaps
 
-Mermaid `style` directives use hardcoded hex colors that only work in one theme. Store source strings with light-mode colors, swap to dark equivalents before rendering.
-
-**CRITICAL**: The swap function must be one-directional. Sources are always light-mode. Only swap when dark. Do NOT attempt to reverse-swap in light mode — color collisions will corrupt fills.
+Sources are always stored in light-mode colors. Swap to dark only when rendering in dark mode. NEVER reverse-swap.
 
 ```javascript
 const nodeColorSwaps = [
-  // [lightFill, lightStroke, lightText] → [darkFill, darkStroke, darkText]
-  { light: ['#f0fdf4','#10b981','#065f46'], dark: ['#064e3b','#34d399','#d1fae5'] }, // green/success
-  { light: ['#fee2e2','#ef4444','#991b1b'], dark: ['#450a0a','#f87171','#fecaca'] }, // red/error
-  { light: ['#fef3c7','#f59e0b','#92400e'], dark: ['#451a03','#fbbf24','#fde68a'] }, // amber/warning
-  { light: ['#dbeafe','#3b82f6','#1e3a5f'], dark: ['#172554','#60a5fa','#bfdbfe'] }, // blue
+  { light: ['#f0fdf4','#10b981','#065f46'], dark: ['#064e3b','#34d399','#d1fae5'] },
+  { light: ['#fee2e2','#ef4444','#991b1b'], dark: ['#450a0a','#f87171','#fecaca'] },
+  { light: ['#fef3c7','#f59e0b','#92400e'], dark: ['#451a03','#fbbf24','#fde68a'] },
+  { light: ['#dbeafe','#3b82f6','#1e3a5f'], dark: ['#172554','#60a5fa','#bfdbfe'] },
 ];
 
 function swapNodeColors(source, isDark) {
@@ -88,6 +192,8 @@ function swapNodeColors(source, isDark) {
   return s;
 }
 ```
+
+---
 
 ## Dark Mode CSS
 
@@ -121,9 +227,11 @@ html.dark { color-scheme: dark; }
 .dark .toc-link.active { color: #60a5fa !important; border-left-color: #60a5fa !important; background-color: #1e293b !important; }
 ```
 
-Extend with callout overrides using the color table above. Pattern: `.dark .bg-{color}-50 { background-color: <dark bg> !important; }` etc.
+---
 
-## Component Patterns
+## Reusable Component Patterns
+
+These are reference implementations. Use them as-is, modify them, or build something completely different. They exist so you don't have to reinvent boilerplate.
 
 ### Code Block with File Path
 
@@ -137,53 +245,7 @@ Extend with callout overrides using the color table above. Pattern: `.dark .bg-{
 </div>
 ```
 
-### Diagram Container
-
-Diagrams are click-to-zoom — clicking an SVG opens a full-screen overlay at native resolution with scroll panning.
-
-```html
-<div class="my-8 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
-  <p class="flex items-center gap-2 mb-4 text-sm font-medium text-slate-500">
-    <!-- diagram icon SVG --> Diagram Title
-  </p>
-  <div class="mermaid">graph LR
-    A --> B</div>
-</div>
-```
-
-### Diagram Zoom Overlay
-
-Place before `</body>`. The skeleton template includes this automatically.
-
-```html
-<div class="diagram-overlay" id="diagram-overlay" onclick="closeDiagramZoom()">
-  <div class="diagram-overlay-inner" id="diagram-overlay-inner" onclick="event.stopPropagation()"></div>
-  <div class="diagram-overlay-hint">Click outside or press Esc to close &middot; Scroll to pan</div>
-</div>
-```
-
-CSS (included in skeleton):
-```css
-.diagram-overlay {
-  position: fixed; inset: 0; z-index: 100;
-  background: rgba(0,0,0,0.85);
-  display: flex; align-items: center; justify-content: center;
-  cursor: zoom-out;
-  opacity: 0; transition: opacity 0.2s ease;
-  pointer-events: none;
-}
-.diagram-overlay.open { opacity: 1; pointer-events: auto; }
-.diagram-overlay-inner {
-  max-width: 95vw; max-height: 90vh;
-  overflow: auto; padding: 24px;
-}
-.diagram-overlay-inner svg { max-width: none !important; cursor: grab; overflow: visible !important; }
-.diagram-overlay-inner svg foreignObject { overflow: visible !important; }
-```
-
-**CRITICAL**: Mermaid SVGs default to `overflow: hidden`, which clips text that overflows node boundaries. Always set `overflow: visible !important` on both the `<svg>` and `foreignObject` elements — in both the inline `.mermaid` container and the zoom overlay.
-
-### Callout Card (one pattern, vary colors by type)
+### Callout Card
 
 ```html
 <div class="flex gap-4 p-5 rounded-xl bg-{color}-50 border border-{color}-200">
@@ -205,7 +267,6 @@ Color mapping: red = error, amber = warning, emerald = success, violet = tip/ins
     <div class="absolute -left-8 top-1 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</div>
     <h4 class="font-semibold text-slate-900 mb-2">Step Title</h4>
     <p class="text-sm text-slate-600 mb-3">Explanation.</p>
-    <!-- code block or diagram -->
   </div>
 </div>
 ```
@@ -220,6 +281,42 @@ Color mapping: red = error, amber = warning, emerald = success, violet = tip/ins
   </h2>
   <div class="space-y-6"><!-- content --></div>
 </section>
+```
+
+### Visualization Container
+
+Generic wrapper for any custom visualization. Works for Canvas, SVG, or anything else.
+
+```html
+<div class="my-8 p-6 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+  <p class="flex items-center gap-2 mb-4 text-sm font-medium text-slate-500">
+    <!-- icon SVG --> Title
+  </p>
+  <!-- Your visualization goes here: canvas, svg, divs, whatever -->
+</div>
+```
+
+### Mermaid Diagram Container
+
+```html
+<div class="my-8 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
+  <p class="flex items-center gap-2 mb-4 text-sm font-medium text-slate-500">
+    <!-- diagram icon SVG --> Diagram Title
+  </p>
+  <div class="mermaid">graph LR
+    A --> B</div>
+</div>
+```
+
+### Diagram Zoom Overlay
+
+Place before `</body>`. Included in skeleton automatically.
+
+```html
+<div class="diagram-overlay" id="diagram-overlay" onclick="closeDiagramZoom()">
+  <div class="diagram-overlay-inner" id="diagram-overlay-inner" onclick="event.stopPropagation()"></div>
+  <div class="diagram-overlay-hint">Click outside or press Esc to close &middot; Scroll to pan</div>
+</div>
 ```
 
 ### Files Reference List
